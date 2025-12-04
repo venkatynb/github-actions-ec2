@@ -1,0 +1,40 @@
+name: Deploy to EC2 via SSH
+
+on:
+  push:
+    branches: [ "master", "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Install rsync
+      run: sudo apt-get update && sudo apt-get install -y rsync
+
+    - name: Setup SSH key
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Copy files to EC2 (rsync)
+      env:
+        SSH_HOST: ${{ secrets.SSH_HOST }}
+        SSH_USER: ${{ secrets.SSH_USER }}
+        TARGET_DIR: ${{ secrets.TARGET_DIR }}
+      run: |
+        # ensure target dir exists
+        ssh -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "mkdir -p $TARGET_DIR && sudo chown $SSH_USER:$SSH_USER $TARGET_DIR"
+        # rsync files (exclude .github)
+        rsync -avz --delete --exclude='.git' --exclude='.github' ./ $SSH_USER@$SSH_HOST:$TARGET_DIR/
+
+    - name: Move files to nginx and restart nginx
+      env:
+        SSH_HOST: ${{ secrets.SSH_HOST }}
+        SSH_USER: ${{ secrets.SSH_USER }}
+      run: |
+        # move to nginx html and restart (requires sudo)
+        ssh -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "sudo cp -r /var/www/my-site/* /usr/share/nginx/html/ && sudo systemctl restart nginx && sudo systemctl status nginx --no-pager"
+
