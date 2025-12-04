@@ -1,4 +1,4 @@
-name: Deploy to EC2 via SSH
+name: Deploy to EC2 via SSH1
 
 on:
   push:
